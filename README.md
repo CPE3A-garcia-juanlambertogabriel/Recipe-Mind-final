@@ -17,9 +17,8 @@ A comprehensive recipe search, nutrition analysis, and AI-powered meal planning 
 - Composer
 - XAMPP/WAMP/MAMP (for local development)
 
-### Installation Steps
+### Installation
 
-1. **Clone the repository**
 ```bash
 git clone <your-repository-url>
 cd recipe-mind-final
