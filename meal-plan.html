@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Meal Planner — RecipeMind</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="index.html" class="nav-logo">
+        <div class="logo-icon">🍃</div>
+        RecipeMind
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="search.html">Find Recipes</a></li>
+        <li><a href="favorites.html">Favorites</a></li>
+        <li><a href="meal-plan.html" class="active">Meal Planner</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-ghost btn-sm" id="nav-login-btn">Login</a>
+        <a href="register.html" class="btn btn-primary btn-sm" id="nav-register-btn">Sign Up</a>
+        <div id="nav-user-menu" style="display:none; align-items:center; gap:0.75rem;">
+          <span style="font-size:0.85rem; color:var(--text-muted);">👤 <span id="nav-user-email"></span></span>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="meal-plan-hero">
+    <div class="meal-plan-hero-inner">
+      <div>
+        <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.9);font-size:0.8rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:0.4rem 1rem;border-radius:40px;margin-bottom:1.5rem;">
+          🤖 Powered by Claude AI
+        </div>
+        <h1 class="meal-plan-title">Your <em>personalized</em><br>weekly meal plan</h1>
+        <p class="meal-plan-desc">
+          Tell our AI what ingredients you have and your dietary preferences.
+          It will generate a complete 7-day meal plan with breakfast, lunch, and dinner —
+          tailored just for you.
+        </p>
+        <div style="display:flex; gap:2rem;">
+          <div>
+            <div style="font-family:var(--font-display); font-size:1.4rem; font-weight:700;">7 Days</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.6);">Full meal plan</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-display); font-size:1.4rem; font-weight:700;">3 Meals</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.6);">Per day</div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-display); font-size:1.4rem; font-weight:700;">AI</div>
+            <div style="font-size:0.8rem; color:rgba(255,255,255,0.6);">Personalized</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="meal-plan-form">
+        <div class="form-group">
+          <label class="form-label">Available ingredients</label>
+          <textarea
+            id="ingredients-input"
+            placeholder="e.g. chicken breast, rice, broccoli, garlic, olive oil, eggs, tomatoes..."
+          ></textarea>
+        </div>
+
+        <div class="meal-plan-options">
+          <div>
+            <label class="form-label" style="font-size:0.8rem;">Diet preference</label>
+            <select id="diet-pref">
+              <option value="balanced">Balanced</option>
+              <option value="vegetarian">Vegetarian</option>
+              <option value="vegan">Vegan</option>
+              <option value="keto">Keto</option>
+              <option value="paleo">Paleo</option>
+              <option value="mediterranean">Mediterranean</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" style="font-size:0.8rem;">Cooking skill</label>
+            <select id="skill-level">
+              <option value="beginner">Beginner</option>
+              <option value="intermediate">Intermediate</option>
+              <option value="advanced">Advanced</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Any allergies or restrictions?</label>
+          <textarea
+            id="restrictions-input"
+            placeholder="e.g. nut-free, no shellfish, lactose intolerant..."
+            style="min-height:60px; margin-bottom:0;"
+          ></textarea>
+        </div>
+
+        <button class="btn btn-terra btn-lg" onclick="generateMealPlan()" id="generate-btn" style="width:100%; margin-top:1rem;">
+          🤖 Generate My Meal Plan
+        </button>
+      </div>
+    </div>
+  </div>
+
+  
+  <div id="plan-loading" style="display:none; background:var(--white); padding:4rem 2rem; text-align:center;">
+    <div class="spinner" style="margin:0 auto 1rem;"></div>
+    <h3 style="font-family:var(--font-display); color:var(--charcoal); margin-bottom:0.5rem;">Claude AI is crafting your meal plan...</h3>
+    <p style="color:var(--text-muted);">This usually takes 10-20 seconds. Hang tight!</p>
+  </div>
+
+  
+  <div id="plan-results" class="plan-results" style="display:none;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:2rem;">
+      <div>
+        <h2 style="font-family:var(--font-display); font-size:1.8rem; color:var(--charcoal); margin-bottom:0.3rem;">Your 7-Day Meal Plan</h2>
+        <p style="color:var(--text-muted); font-size:0.9rem;" id="plan-meta"></p>
+      </div>
+      <div style="display:flex; gap:0.75rem;">
+        <button class="btn btn-secondary" onclick="saveMealPlan()" id="save-plan-btn">💾 Save Plan</button>
+        <button class="btn btn-ghost" onclick="resetPlan()">Try Again</button>
+      </div>
+    </div>
+
+    <div class="plan-week" id="plan-week"></div>
+
+    
+    <div id="plan-tips" style="background:var(--white); border-radius:var(--radius-lg); padding:1.5rem; box-shadow:var(--shadow-sm); margin-top:1rem;">
+      <h3 style="font-family:var(--font-display); font-size:1.1rem; color:var(--charcoal); margin-bottom:1rem;">
+        🌿 AI Tips & Notes
+      </h3>
+      <div id="tips-content" style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;"></div>
+    </div>
+
+  </div>
+
+  <div style="max-width:1200px; margin:0 auto; padding:2rem;" id="saved-plans-section">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:1.5rem;">
+      <h2 style="font-family:var(--font-display); font-size:1.4rem; color:var(--charcoal);">📚 Your Saved Plans</h2>
+    </div>
+    <div id="saved-plans-grid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(280px,1fr)); gap:1rem;"></div>
+    <div id="saved-plans-empty" style="display:none; text-align:center; padding:2rem; color:var(--text-muted);">
+      No saved plans yet. Generate one above!
+    </div>
+    <div id="saved-plans-loading" style="text-align:center; padding:2rem; color:var(--text-muted);">Loading saved plans...</div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-logo">🍃 RecipeMind</span>
+      <span style="font-size:0.8rem;">AI Meal Plans powered by Claude</span>
+    </div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script>
+    let currentUser = null;
+    let currentPlan = null;
+
+    const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+    (async () => {
+      updateNavAuth();
+      currentUser = await getCurrentUser();
+      loadSavedPlans();
+    })();
+
+    async function generateMealPlan() {
+      const ingredients = document.getElementById('ingredients-input').value.trim();
+      const diet = document.getElementById('diet-pref').value;
+      const skill = document.getElementById('skill-level').value;
+      const restrictions = document.getElementById('restrictions-input').value.trim();
+
+      if (!ingredients) {
+        showToast('Please enter your available ingredients!', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('generate-btn');
+      btn.disabled = true;
+      btn.textContent = '🤖 Generating...';
+      document.getElementById('plan-loading').style.display = '';
+      document.getElementById('plan-results').style.display = 'none';
+
+      try {
+        const res = await fetch('/api/meal-plan', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ingredients, diet, skill, restrictions })
+        });
+
+        const data = await res.json();
+
+        if (data.error) throw new Error(data.error);
+
+        currentPlan = data;
+        renderMealPlan(data, ingredients, diet);
+      } catch (err) {
+        showToast('Failed to generate meal plan. Check your API keys.', 'error');
+        console.error(err);
+      } finally {
+        document.getElementById('plan-loading').style.display = 'none';
+        btn.disabled = false;
+        btn.textContent = '🤖 Generate My Meal Plan';
+      }
+    }
+
+    function renderMealPlan(plan, ingredients, diet) {
+      document.getElementById('plan-meta').textContent =
+        `Based on: ${ingredients.substring(0, 60)}${ingredients.length > 60 ? '...' : ''} · Diet: ${diet}`;
+
+      const week = document.getElementById('plan-week');
+      week.innerHTML = DAYS.map((day, i) => {
+        const dayPlan = plan.days?.[i] || plan.days?.[day] || {};
+        return `
+          <div class="plan-day-card">
+            <div class="plan-day-header">${day.substring(0, 3).toUpperCase()}</div>
+            <div class="plan-meal">
+              <div class="plan-meal-label">🌅 Breakfast</div>
+              <div class="plan-meal-name">${dayPlan.breakfast || 'Not specified'}</div>
+            </div>
+            <div class="plan-meal">
+              <div class="plan-meal-label">☀️ Lunch</div>
+              <div class="plan-meal-name">${dayPlan.lunch || 'Not specified'}</div>
+            </div>
+            <div class="plan-meal">
+              <div class="plan-meal-label">🌙 Dinner</div>
+              <div class="plan-meal-name">${dayPlan.dinner || 'Not specified'}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      document.getElementById('tips-content').textContent = plan.tips || 'Enjoy your personalized meal plan! Remember to stay hydrated and adjust portions based on your caloric needs.';
+
+      document.getElementById('plan-results').style.display = '';
+      document.getElementById('plan-results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    async function saveMealPlan() {
+      if (!currentUser) {
+        showToast('Please log in to save your meal plan!', 'error');
+        setTimeout(() => window.location.href = 'login.html', 1500);
+        return;
+      }
+
+      const ingredients = document.getElementById('ingredients-input').value.trim();
+      const diet = document.getElementById('diet-pref').value;
+
+      const { error } = await sb.from('meal_plans').insert({
+        user_id: currentUser.id,
+        title: `${diet.charAt(0).toUpperCase() + diet.slice(1)} Plan — ${new Date().toLocaleDateString()}`,
+        ingredients_used: ingredients,
+        plan_data: currentPlan
+      });
+
+      if (error) {
+        showToast('Failed to save plan.', 'error');
+      } else {
+        showToast('Meal plan saved!', 'success');
+        document.getElementById('save-plan-btn').textContent = '✓ Saved!';
+        document.getElementById('save-plan-btn').disabled = true;
+        loadSavedPlans();
+      }
+    }
+
+    function resetPlan() {
+      document.getElementById('plan-results').style.display = 'none';
+      currentPlan = null;
+      document.getElementById('save-plan-btn').textContent = '💾 Save Plan';
+      document.getElementById('save-plan-btn').disabled = false;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    async function loadSavedPlans() {
+      const loading = document.getElementById('saved-plans-loading');
+      const grid = document.getElementById('saved-plans-grid');
+      const empty = document.getElementById('saved-plans-empty');
+
+      if (!currentUser) {
+        loading.style.display = 'none';
+        empty.style.display = '';
+        empty.textContent = 'Log in to see your saved meal plans.';
+        return;
+      }
+
+      const { data, error } = await sb
+        .from('meal_plans')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(6);
+
+      loading.style.display = 'none';
+
+      if (error || !data || data.length === 0) {
+        empty.style.display = '';
+        return;
+      }
+
+      grid.innerHTML = data.map(plan => `
+        <div style="background:var(--white); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;">
+          <div>
+            <div style="font-family:var(--font-display); font-size:1rem; font-weight:600; color:var(--charcoal); margin-bottom:0.3rem;">${plan.title}</div>
+            <div style="font-size:0.8rem; color:var(--text-muted);">${new Date(plan.created_at).toLocaleDateString()}</div>
+          </div>
+          ${plan.ingredients_used ? `<div style="font-size:0.8rem; color:var(--text-muted); background:var(--cream); border-radius:var(--radius-sm); padding:0.5rem 0.75rem;">🥬 ${plan.ingredients_used.substring(0, 80)}${plan.ingredients_used.length > 80 ? '...' : ''}</div>` : ''}
+          <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+            <button class="btn btn-sm btn-secondary" onclick="viewSavedPlan('${plan.id}')">View</button>
+            <button class="btn btn-sm btn-ghost" onclick="deleteSavedPlan('${plan.id}', this)">Delete</button>
+          </div>
+        </div>`).join('');
+    }
+
+    async function viewSavedPlan(planId) {
+      const { data, error } = await sb.from('meal_plans').select('*').eq('id', planId).single();
+      if (error || !data) { showToast('Could not load plan.', 'error'); return; }
+      currentPlan = data.plan_data;
+      renderMealPlan(data.plan_data, data.ingredients_used || '', 'saved');
+      document.getElementById('save-plan-btn').style.display = 'none';
+    }
+
+    async function deleteSavedPlan(planId, btn) {
+      const { error } = await sb.from('meal_plans').delete().eq('id', planId).eq('user_id', currentUser.id);
+      if (!error) {
+        btn.closest('div[style]').remove();
+        showToast('Plan deleted.', 'default');
+        loadSavedPlans();
+      }
+    }
+  </script>
+</body>
+</html>

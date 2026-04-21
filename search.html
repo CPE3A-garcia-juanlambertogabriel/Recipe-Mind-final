@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Find Recipes — RecipeMind</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="index.html" class="nav-logo">
+        <div class="logo-icon">🍃</div>
+        RecipeMind
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html">Home</a></li>
+        <li><a href="search.html" class="active">Find Recipes</a></li>
+        <li><a href="favorites.html">Favorites</a></li>
+        <li><a href="meal-plan.html">Meal Planner</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-ghost btn-sm" id="nav-login-btn">Login</a>
+        <a href="register.html" class="btn btn-primary btn-sm" id="nav-register-btn">Sign Up</a>
+        <div id="nav-user-menu" style="display:none; align-items:center; gap:0.75rem;">
+          <span style="font-size:0.85rem; color:var(--text-muted);">👤 <span id="nav-user-email"></span></span>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="search-page">
+    <div class="search-page-inner">
+
+      <div class="search-page-header">
+        <h1 class="search-page-title">Find Recipes</h1>
+        <p style="color:var(--text-muted);">Add your ingredients below and discover what you can cook</p>
+      </div>
+
+      <div class="big-search-box">
+        <div class="search-label">Your ingredients</div>
+        <div class="ingredient-tags" id="ingredient-tags"></div>
+        <input
+          type="text"
+          id="ingredient-input"
+          placeholder="Type an ingredient and press Enter or Add..."
+        />
+        <div class="search-actions">
+          <button class="btn btn-secondary" onclick="addIngredient()">+ Add</button>
+          <button class="btn btn-ghost" onclick="clearIngredients()">Clear all</button>
+          <button class="btn btn-terra btn-lg" onclick="searchRecipes()" style="margin-left:auto;">
+            🔍 Search Recipes
+          </button>
+        </div>
+      </div>
+
+      <div id="results-section" style="display:none;">
+        <div class="results-header">
+          <div class="results-count">Found <span id="results-count">0</span> recipes</div>
+          <div style="font-size:0.8rem; color:var(--text-muted);">Powered by Spoonacular</div>
+        </div>
+        <div class="recipes-grid" id="recipes-grid"></div>
+      </div>
+
+      <div id="loading-state" style="display:none;">
+        <div class="loading-spinner">
+          <div class="spinner"></div>
+          <p>Searching recipes...</p>
+        </div>
+      </div>
+
+      <div id="empty-state">
+        <div class="empty-state">
+          <div class="empty-state-icon">🥬</div>
+          <h3>Add ingredients to get started</h3>
+          <p>Type in what you have in your fridge and we'll find the best recipes for you.</p>
+        </div>
+      </div>
+
+      <div id="no-results" style="display:none;">
+        <div class="empty-state">
+          <div class="empty-state-icon">🔍</div>
+          <h3>No recipes found</h3>
+          <p>Try different ingredients or add more items to get better results.</p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="nutrition-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:500; align-items:center; justify-content:center; padding:1rem;">
+    <div style="background:var(--white); border-radius:var(--radius-xl); padding:2rem; max-width:500px; width:100%; max-height:90vh; overflow-y:auto; position:relative;">
+      <button onclick="closeNutrition()" style="position:absolute; top:1rem; right:1rem; background:var(--cream-dark); border:none; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:1rem;">×</button>
+      <h2 id="nutrition-recipe-name" style="font-family:var(--font-display); font-size:1.4rem; margin-bottom:1.5rem; padding-right:2rem;"></h2>
+      <div id="nutrition-loading" class="loading-spinner" style="padding:2rem;">
+        <div class="spinner"></div>
+        <p>Loading nutrition data...</p>
+      </div>
+      <div id="nutrition-content" style="display:none;"></div>
+    </div>
+  </div>
+
+  <footer class="footer" style="margin-top:4rem;">
+    <div class="footer-inner">
+      <span class="footer-logo">🍃 RecipeMind</span>
+      <span style="font-size:0.8rem;">Powered by Spoonacular & Edamam APIs</span>
+    </div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script>
+    let ingredients = [];
+    let currentUser = null;
+    let userFavorites = new Set();
+
+    (async () => {
+      updateNavAuth();
+      currentUser = await getCurrentUser();
+      if (currentUser) await loadUserFavorites();
+
+      const params = new URLSearchParams(window.location.search);
+      const urlIngredients = params.get('ingredients');
+      if (urlIngredients) {
+        urlIngredients.split(',').forEach(ing => {
+          if (ing.trim()) ingredients.push(ing.trim());
+        });
+        renderTags();
+        searchRecipes();
+      }
+    })();
+
+    async function loadUserFavorites() {
+      const { data } = await sb.from('favorites').select('recipe_id').eq('user_id', currentUser.id);
+      if (data) data.forEach(f => userFavorites.add(f.recipe_id));
+    }
+
+    function addIngredient() {
+      const input = document.getElementById('ingredient-input');
+      const val = input.value.trim().toLowerCase();
+      if (!val || ingredients.includes(val)) { input.value = ''; return; }
+      ingredients.push(val);
+      renderTags();
+      input.value = '';
+      input.focus();
+    }
+
+    function removeIngredient(ing) {
+      ingredients = ingredients.filter(i => i !== ing);
+      renderTags();
+    }
+
+    function clearIngredients() {
+      ingredients = [];
+      renderTags();
+      showState('empty');
+    }
+
+    function renderTags() {
+      const container = document.getElementById('ingredient-tags');
+      container.innerHTML = ingredients.map(ing =>
+        `<span class="ingredient-tag">${ing} <button onclick="removeIngredient('${ing}')">×</button></span>`
+      ).join('');
+    }
+
+    document.getElementById('ingredient-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addIngredient();
+    });
+
+    function showState(state) {
+      document.getElementById('empty-state').style.display = state === 'empty' ? '' : 'none';
+      document.getElementById('loading-state').style.display = state === 'loading' ? '' : 'none';
+      document.getElementById('results-section').style.display = state === 'results' ? '' : 'none';
+      document.getElementById('no-results').style.display = state === 'no-results' ? '' : 'none';
+    }
+
+    async function searchRecipes() {
+      if (ingredients.length === 0) {
+        showToast('Add at least one ingredient first!', 'error');
+        return;
+      }
+
+      showState('loading');
+
+      try {
+        const res = await fetch(`/api/search?ingredients=${encodeURIComponent(ingredients.join(','))}`);
+        const data = await res.json();
+
+        if (!data || data.length === 0) {
+          showState('no-results');
+          return;
+        }
+
+        document.getElementById('results-count').textContent = data.length;
+        renderRecipes(data);
+        showState('results');
+      } catch (err) {
+        showToast('Search failed. Check your API key or try again.', 'error');
+        showState('empty');
+      }
+    }
+
+    function renderRecipes(recipes) {
+      const grid = document.getElementById('recipes-grid');
+      grid.innerHTML = recipes.map((recipe, i) => {
+        const isFav = userFavorites.has(String(recipe.id));
+        const missed = recipe.missedIngredientCount || 0;
+        return `
+          <div class="recipe-card" style="animation-delay:${i * 0.05}s">
+            <div class="recipe-card-img">
+              <img src="${recipe.image || 'https://via.placeholder.com/400x300?text=No+Image'}" alt="${recipe.title}" loading="lazy" />
+              <div class="recipe-card-badges">
+                ${missed === 0 ? '<span class="badge badge-green">✓ All Ingredients</span>' : ''}
+              </div>
+              <button class="fav-btn ${isFav ? 'active' : ''}"
+                id="fav-btn-${recipe.id}"
+                onclick="toggleFavorite(${recipe.id}, '${escapeStr(recipe.title)}', '${recipe.image || ''}')">
+                ${isFav ? '❤️' : '🤍'}
+              </button>
+            </div>
+            <div class="recipe-card-body">
+              <h3 class="recipe-card-title">${recipe.title}</h3>
+              <div class="recipe-card-meta">
+                <span class="meta-item">🧂 ${recipe.usedIngredientCount || 0} used</span>
+                <span class="meta-item">🛒 ${missed} missing</span>
+              </div>
+              <div class="recipe-card-footer">
+                <span class="missed-ingredients">
+                  ${missed > 0 ? `Missing: ${(recipe.missedIngredients || []).slice(0,2).map(i => i.name).join(', ')}` : '✓ Ready to cook!'}
+                </span>
+                <button class="btn btn-sm btn-secondary" onclick="showNutrition('${recipe.id}', '${escapeStr(recipe.title)}')">
+                  📊 Nutrition
+                </button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function escapeStr(str) {
+      return str.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+    }
+
+    async function toggleFavorite(recipeId, title, image) {
+      if (!currentUser) {
+        showToast('Please log in to save favorites!', 'error');
+        setTimeout(() => window.location.href = 'login.html', 1500);
+        return;
+      }
+
+      const id = String(recipeId);
+      const btn = document.getElementById(`fav-btn-${recipeId}`);
+
+      if (userFavorites.has(id)) {
+        const { error } = await sb.from('favorites')
+          .delete()
+          .eq('user_id', currentUser.id)
+          .eq('recipe_id', id);
+
+        if (!error) {
+          userFavorites.delete(id);
+          btn.textContent = '🤍';
+          btn.classList.remove('active');
+          showToast('Removed from favorites', 'default');
+        }
+      } else {
+        const { error } = await sb.from('favorites').insert({
+          user_id: currentUser.id,
+          recipe_id: id,
+          recipe_title: title,
+          recipe_image: image,
+          recipe_source: 'spoonacular'
+        });
+
+        if (!error) {
+          userFavorites.add(id);
+          btn.textContent = '❤️';
+          btn.classList.add('active');
+          showToast('Saved to favorites!', 'success');
+        }
+      }
+    }
+
+    async function showNutrition(recipeId, recipeName) {
+      const modal = document.getElementById('nutrition-modal');
+      modal.style.display = 'flex';
+      document.getElementById('nutrition-recipe-name').textContent = recipeName;
+      document.getElementById('nutrition-loading').style.display = 'flex';
+      document.getElementById('nutrition-content').style.display = 'none';
+
+      try {
+        const res = await fetch(`/api/nutrition?query=${encodeURIComponent(recipeName)}`);
+        const data = await res.json();
+
+        const hit = data.hits?.[0]?.recipe;
+        if (!hit) {
+          document.getElementById('nutrition-content').innerHTML = '<p style="color:var(--text-muted);">No nutrition data found for this recipe.</p>';
+        } else {
+          const nutrients = hit.totalNutrients;
+          document.getElementById('nutrition-content').innerHTML = `
+            <div class="nutrition-grid">
+              <div class="nutrition-item">
+                <div class="nutrition-value">${Math.round(hit.calories || 0)}</div>
+                <div class="nutrition-label">Calories</div>
+              </div>
+              <div class="nutrition-item">
+                <div class="nutrition-value">${Math.round(nutrients?.PROCNT?.quantity || 0)}g</div>
+                <div class="nutrition-label">Protein</div>
+              </div>
+              <div class="nutrition-item">
+                <div class="nutrition-value">${Math.round(nutrients?.CHOCDF?.quantity || 0)}g</div>
+                <div class="nutrition-label">Carbs</div>
+              </div>
+              <div class="nutrition-item">
+                <div class="nutrition-value">${Math.round(nutrients?.FAT?.quantity || 0)}g</div>
+                <div class="nutrition-label">Fat</div>
+              </div>
+            </div>
+            <div style="margin-top:1.5rem; padding-top:1rem; border-top:1px solid var(--cream-dark);">
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem; font-weight:600;">More Details</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; font-size:0.85rem;">
+                <span>🫀 Fiber: ${Math.round(nutrients?.FIBTG?.quantity || 0)}g</span>
+                <span>🧂 Sodium: ${Math.round(nutrients?.NA?.quantity || 0)}mg</span>
+                <span>🍬 Sugar: ${Math.round(nutrients?.SUGAR?.quantity || 0)}g</span>
+                <span>🥑 Sat. Fat: ${Math.round(nutrients?.FASAT?.quantity || 0)}g</span>
+              </div>
+            </div>
+            <div style="margin-top:1rem; font-size:0.75rem; color:var(--text-muted);">
+              Servings: ${hit.yield || 'N/A'} · Diet: ${(hit.dietLabels || []).join(', ') || 'None specified'}
+            </div>
+          `;
+        }
+      } catch (err) {
+        document.getElementById('nutrition-content').innerHTML = '<p style="color:var(--text-muted);">Could not load nutrition data.</p>';
+      }
+
+      document.getElementById('nutrition-loading').style.display = 'none';
+      document.getElementById('nutrition-content').style.display = 'block';
+    }
+
+    function closeNutrition() {
+      document.getElementById('nutrition-modal').style.display = 'none';
+    }
+
+    document.getElementById('nutrition-modal').addEventListener('click', function(e) {
+      if (e.target === this) closeNutrition();
+    });
+  </script>
+</body>
+</html>
