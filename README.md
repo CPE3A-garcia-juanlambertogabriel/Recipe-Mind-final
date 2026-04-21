@@ -23,3 +23,19 @@ A comprehensive recipe search, nutrition analysis, and AI-powered meal planning 
 ```bash
 git clone <your-repository-url>
 cd recipe-mind-final
+
+## 📦 Installing Composer (Windows)
+
+1. **Download Composer**:
+   - Go to https://getcomposer.org/download/
+   - Click "Composer-Setup.exe"
+
+2. **Run the installer**:
+   - Check "Install for all users" (recommended)
+   - Check "Add to PATH" (important!)
+   - Select PHP version (XAMPP's PHP)
+     - Browse to: `C:\xampp\php\php.exe`
+
+3. **Verify installation**:
+   ```bash
+   composer --version
