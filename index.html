@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RecipeMind — AI-Powered Recipe Finder</title>
+  <link rel="stylesheet" href="../css/style.css" />
+  <link rel="icon" href="/assets/leaves.png">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <nav class="navbar">
+    <div class="navbar-inner">
+      <a href="index.html" class="nav-logo">
+        <div class="logo-icon">🍃</div>
+        RecipeMind
+      </a>
+      <ul class="nav-links">
+        <li><a href="index.html" class="active">Find Recipes</a></li>
+        <li><a href="favorites.html">Favorites</a></li>
+        <li><a href="meal-plan.html">Meal Planner</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="login.html" class="btn btn-ghost btn-sm" id="nav-login-btn">Login</a>
+        <a href="register.html" class="btn btn-primary btn-sm" id="nav-register-btn">Sign Up</a>
+        <div id="nav-user-menu" style="display:none; align-items:center; gap:0.75rem;">
+          <span style="font-size:0.85rem; color:var(--text-muted);">
+            👤 <span id="nav-user-email"></span>
+          </span>
+          <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+ 
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-decor hero-decor-1"></div>
+    <div class="hero-decor hero-decor-2"></div>
+
+    <div class="hero-content">
+      <div class="hero-text">
+        <div class="hero-eyebrow">🤖 AI-Powered</div>
+        <h1 class="hero-title">
+          Turn your ingredients into <em>delicious</em> meals
+        </h1>
+        <p class="hero-subtitle">
+          Type in what's in your fridge and let our AI suggest personalized recipes,
+          nutritional info, and custom meal plans — instantly.
+        </p>
+
+        
+        <div class="hero-search-box">
+          <div class="search-label">Add your ingredients</div>
+          <div class="ingredient-tags" id="hero-tags"></div>
+          <div class="search-input-row">
+            <div class="search-input-wrap">
+              <input
+                type="text"
+                id="hero-ingredient-input"
+                placeholder="e.g. chicken, garlic, tomatoes..."
+              />
+            </div>
+            <button class="btn btn-secondary btn-sm" onclick="addHeroIngredient()">+ Add</button>
+          </div>
+          <div style="margin-top:1rem;">
+            <button class="btn btn-terra btn-lg" onclick="goToSearch()" style="width:100%;">
+              🔍 Find Recipes
+            </button>
+          </div>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat-item">
+            <div class="stat-num">365K+</div>
+            <div class="stat-label">Recipes</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">2 APIs</div>
+            <div class="stat-label">Data Sources</div>
+          </div>
+          <div class="stat-item">
+            <div class="stat-num">AI</div>
+            <div class="stat-label">Meal Planner</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-card-stack">
+          <div class="hero-food-card">
+            <img src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=400&q=80" alt="Pancakes" />
+          </div>
+          <div class="hero-food-card">
+            <img src="https://www.thespruceeats.com/thmb/mKQ4LuP3oEyUFpeY42EOECT2EUA=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/SES-easy-australian-and-new-zealand-recipes-for-beginners-4125719-206abe74dff34de49690d424bae9a47b.jpg" alt="Breakfast" />
+          </div>
+          <div class="hero-food-card">
+            <img src="https://dairyfarmersofcanada.ca/sites/default/files/styles/card_large/public/image_file_browser/conso_recipe/2025/5ee08d85-9b82-4a42-92cd-9e57a9760b8a%20%282%29.jpg?itok=xGPX0Mxe" alt="Pasta" />
+          </div>
+          <div class="hero-food-card">
+            <img src="https://www.foodandwine.com/thmb/kK0ObB-TcBEDD6CqSKE0468nR1I=/750x0/filters:no_upscale():max_bytes(150000):strip_icc():format(webp)/Turkey-Meatballs-with-Cranberry-Sauce-FT-BLOG1022-d01ed8807b6241c290020694d11db493.png" alt="Meat balls" />
+          </div>
+          <div class="hero-food-card">
+            <span style="font-size:2.5rem;">🍃</span>
+            <span style="font-size:0.75rem; letter-spacing:0.05em; opacity:0.8;">RecipeMind AI</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--white);">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-eyebrow">Simple Process</span>
+        <h2 class="section-title">How RecipeMind works</h2>
+        <p class="section-subtitle">From your fridge to a full meal plan in seconds</p>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:2rem;">
+        <div style="text-align:center; padding:2rem;">
+          <div style="font-size:2.5rem; margin-bottom:1rem;">🥬</div>
+          <h3 style="font-family:var(--font-display); font-size:1.2rem; margin-bottom:0.5rem; color:var(--charcoal);">1. Add Ingredients</h3>
+          <p style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;">Type in whatever ingredients you have at home — even just a few items work great.</p>
+        </div>
+        <div style="text-align:center; padding:2rem;">
+          <div style="font-size:2.5rem; margin-bottom:1rem;">🔍</div>
+          <h3 style="font-family:var(--font-display); font-size:1.2rem; margin-bottom:0.5rem; color:var(--charcoal);">2. Get Recipe Matches</h3>
+          <p style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;">We search 365K+ recipes via Spoonacular and show you the best matches for your ingredients.</p>
+        </div>
+        <div style="text-align:center; padding:2rem;">
+          <div style="font-size:2.5rem; margin-bottom:1rem;">🤖</div>
+          <h3 style="font-family:var(--font-display); font-size:1.2rem; margin-bottom:0.5rem; color:var(--charcoal);">3. Get AI Meal Plans</h3>
+          <p style="color:var(--text-muted); font-size:0.9rem; line-height:1.7;">Our AI creates personalized weekly meal plans with full nutritional info from Edamam.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-inner">
+      <div class="section-header">
+        <span class="section-eyebrow">Features</span>
+        <h2 class="section-title">Everything you need to eat well</h2>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:1.5rem;">
+        <div style="background:var(--white); border-radius:var(--radius-lg); padding:2rem; box-shadow:var(--shadow-sm); display:flex; gap:1.25rem; align-items:flex-start;">
+          <div style="width:48px; height:48px; background:rgba(45,74,62,0.1); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">👤</div>
+          <div>
+            <h3 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:0.4rem;">User Accounts</h3>
+            <p style="color:var(--text-muted); font-size:0.875rem; line-height:1.6;">Create your profile to save favorites and access your meal plans from anywhere.</p>
+          </div>
+        </div>
+        <div style="background:var(--white); border-radius:var(--radius-lg); padding:2rem; box-shadow:var(--shadow-sm); display:flex; gap:1.25rem; align-items:flex-start;">
+          <div style="width:48px; height:48px; background:rgba(196,98,45,0.1); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">❤️</div>
+          <div>
+            <h3 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:0.4rem;">Favorite Recipes</h3>
+            <p style="color:var(--text-muted); font-size:0.875rem; line-height:1.6;">Save your favorite recipes for quick access anytime. Build your personal cookbook.</p>
+          </div>
+        </div>
+        <div style="background:var(--white); border-radius:var(--radius-lg); padding:2rem; box-shadow:var(--shadow-sm); display:flex; gap:1.25rem; align-items:flex-start;">
+          <div style="width:48px; height:48px; background:rgba(45,74,62,0.1); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">🥗</div>
+          <div>
+            <h3 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:0.4rem;">Ingredient Search</h3>
+            <p style="color:var(--text-muted); font-size:0.875rem; line-height:1.6;">Find recipes based on what you already have. Powered by Spoonacular's 365K+ database.</p>
+          </div>
+        </div>
+        <div style="background:var(--white); border-radius:var(--radius-lg); padding:2rem; box-shadow:var(--shadow-sm); display:flex; gap:1.25rem; align-items:flex-start;">
+          <div style="width:48px; height:48px; background:rgba(196,98,45,0.1); border-radius:12px; display:flex; align-items:center; justify-content:center; font-size:1.4rem; flex-shrink:0;">📊</div>
+          <div>
+            <h3 style="font-family:var(--font-display); font-size:1.1rem; margin-bottom:0.4rem;">Nutritional Info</h3>
+            <p style="color:var(--text-muted); font-size:0.875rem; line-height:1.6;">Full nutrition breakdown for every recipe via the Edamam API — calories, protein, carbs, and more.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="section" style="background:var(--forest); color:var(--white); text-align:center;">
+    <div class="section-inner">
+      <h2 style="font-family:var(--font-display); font-size:2.5rem; margin-bottom:1rem;">Ready to cook smarter?</h2>
+      <p style="color:rgba(255,255,255,0.7); margin-bottom:2rem; font-size:1.05rem;">Join thousands of home cooks using RecipeMind every day.</p>
+      <a href="register.html" class="btn btn-terra btn-lg">Get Started Free</a>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <span class="footer-logo">🍃 RecipeMind</span>
+      <div class="footer-links">
+        <a href="index.html">Home</a>
+        <a href="favorites.html">Favorites</a>
+        <a href="meal-plan.html">Meal Planner</a>
+      </div>
+      <span style="font-size:0.8rem;">© 2026 RecipeMind. Powered by Spoonacular, Edamam & Claude AI.</span>
+    </div>
+  </footer>
+
+  <script src="../js/config.js"></script>
+  <script>
+    
+    let heroIngredients = [];
+
+    function addHeroIngredient() {
+      const input = document.getElementById('hero-ingredient-input');
+      const val = input.value.trim().toLowerCase();
+      if (!val || heroIngredients.includes(val)) { input.value = ''; return; }
+      heroIngredients.push(val);
+      renderHeroTags();
+      input.value = '';
+      input.focus();
+    }
+
+    function removeHeroIngredient(ing) {
+      heroIngredients = heroIngredients.filter(i => i !== ing);
+      renderHeroTags();
+    }
+
+    function renderHeroTags() {
+      const container = document.getElementById('hero-tags');
+      container.innerHTML = heroIngredients.map(ing =>
+        `<span class="ingredient-tag">${ing} <button onclick="removeHeroIngredient('${ing}')">×</button></span>`
+      ).join('');
+    }
+
+    function goToSearch() {
+      if (heroIngredients.length === 0) {
+        showToast('Please add at least one ingredient!', 'error');
+        return;
+      }
+      const params = new URLSearchParams({ ingredients: heroIngredients.join(',') });
+      window.location.href = `search.html?${params.toString()}`;
+    }
+
+    document.getElementById('hero-ingredient-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') addHeroIngredient();
+    });
+
+    updateNavAuth();
+  </script>
+</body>
+</html>
