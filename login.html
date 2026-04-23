@@ -3,9 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Login — RecipeMind</title>
+  <title>Login — Recipe Mind</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -16,7 +15,7 @@
 
       <a href="index.html" class="auth-logo">
         <div class="logo-icon">🍃</div>
-        RecipeMind
+        Recipe Mind
       </a>
 
       <h1 class="auth-title">Welcome back</h1>
@@ -69,6 +68,19 @@
         <span>🌐</span> Continue with Google
       </button>
 
+      <script>
+        // Check for Google OAuth redirect
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        if (token) {
+          localStorage.setItem('auth_token', token);
+          localStorage.setItem('user_id', urlParams.get('user_id') || '');
+          localStorage.setItem('user_email', urlParams.get('email') || '');
+          localStorage.setItem('username', urlParams.get('username') || '');
+          window.location.href = 'dashboard.html';
+        }
+      </script>
+
       <div class="auth-footer">
         Don't have an account? <a href="register.html">Create one free</a>
       </div>
@@ -81,7 +93,7 @@
     
     (async () => {
       const user = await getCurrentUser();
-      if (user) window.location.href = '/index.html';
+      if (user) window.location.href = 'dashboard.html';
     })();
 
     function togglePassword() {
@@ -135,25 +147,44 @@
       btn.disabled = true;
       btn.textContent = 'Signing in...';
 
-      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      try {
+        const res = await fetch('/recipe-mind-final/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
 
-      if (error) {
-        showError(error.message || 'Invalid credentials. Please try again.');
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          showError(data.error || 'Invalid credentials. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Sign In';
+          return;
+        }
+
+        // Store token and user info
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email);
+        localStorage.setItem('username', data.user.username);
+
+        showSuccess('Logged in! Redirecting...');
+        // Check if there's a return URL in query params
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('return');
+        const redirectUrl = returnUrl ? returnUrl : 'dashboard.html';
+        setTimeout(() => { window.location.href = redirectUrl; }, 1000);
+      } catch (err) {
+        showError('Login failed. Please try again.');
         btn.disabled = false;
         btn.textContent = 'Sign In';
-        return;
       }
-
-      showSuccess('Logged in! Redirecting...');
-      setTimeout(() => { window.location.href = 'index.html'; }, 1000);
     }
 
-    async function handleGoogleLogin() {
-      const { error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin + '/index.html' }
-      });
-      if (error) showError(error.message);
+    function handleGoogleLogin() {
+      // Redirect to Google OAuth
+      window.location.href = '/recipe-mind-final/api/auth/google';
     }
 
     document.addEventListener('keypress', (e) => {
