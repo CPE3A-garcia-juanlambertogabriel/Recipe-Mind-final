@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Meal Planner — RecipeMind</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -36,7 +35,7 @@
     <div class="meal-plan-hero-inner">
       <div>
         <div style="display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,0.12);color:rgba(255,255,255,0.9);font-size:0.8rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;padding:0.4rem 1rem;border-radius:40px;margin-bottom:1.5rem;">
-          🤖 Powered by Claude AI
+          🤖 Powered by Google Gemini
         </div>
         <h1 class="meal-plan-title">Your <em>personalized</em><br>weekly meal plan</h1>
         <p class="meal-plan-desc">
@@ -110,7 +109,7 @@
   
   <div id="plan-loading" style="display:none; background:var(--white); padding:4rem 2rem; text-align:center;">
     <div class="spinner" style="margin:0 auto 1rem;"></div>
-    <h3 style="font-family:var(--font-display); color:var(--charcoal); margin-bottom:0.5rem;">Claude AI is crafting your meal plan...</h3>
+    <h3 style="font-family:var(--font-display); color:var(--charcoal); margin-bottom:0.5rem;">AI is crafting your meal plan...</h3>
     <p style="color:var(--text-muted);">This usually takes 10-20 seconds. Hang tight!</p>
   </div>
 
@@ -154,11 +153,11 @@
   <footer class="footer">
     <div class="footer-inner">
       <span class="footer-logo">🍃 RecipeMind</span>
-      <span style="font-size:0.8rem;">AI Meal Plans powered by Claude</span>
+      <span style="font-size:0.8rem;">AI Meal Plans powered by Google Gemini</span>
     </div>
   </footer>
 
-  <script src="../js/config.js"></script>
+  <script src="js/config.js"></script>
   <script>
     let currentUser = null;
     let currentPlan = null;
@@ -166,7 +165,7 @@
     const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
     (async () => {
-      updateNavAuth();
+      await updateNavAuth();
       currentUser = await getCurrentUser();
       loadSavedPlans();
     })();
@@ -189,7 +188,7 @@
       document.getElementById('plan-results').style.display = 'none';
 
       try {
-        const res = await fetch('/api/meal-plan', {
+        const res = await fetch('/recipe-mind-final/api/meal-plan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ ingredients, diet, skill, restrictions })
@@ -202,7 +201,7 @@
         currentPlan = data;
         renderMealPlan(data, ingredients, diet);
       } catch (err) {
-        showToast('Failed to generate meal plan. Check your API keys.', 'error');
+        showToast('Failed to generate meal plan. Please check your Gemini API key.', 'error');
         console.error(err);
       } finally {
         document.getElementById('plan-loading').style.display = 'none';
@@ -251,21 +250,34 @@
 
       const ingredients = document.getElementById('ingredients-input').value.trim();
       const diet = document.getElementById('diet-pref').value;
+      const token = localStorage.getItem('auth_token');
 
-      const { error } = await sb.from('meal_plans').insert({
-        user_id: currentUser.id,
-        title: `${diet.charAt(0).toUpperCase() + diet.slice(1)} Plan — ${new Date().toLocaleDateString()}`,
-        ingredients_used: ingredients,
-        plan_data: currentPlan
-      });
+      try {
+        const res = await fetch('/recipe-mind-final/api/meal-plans', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({
+            title: `${diet.charAt(0).toUpperCase() + diet.slice(1)} Plan — ${new Date().toLocaleDateString()}`,
+            ingredients_used: ingredients,
+            plan_data: currentPlan
+          })
+        });
 
-      if (error) {
+        const data = await res.json();
+        if (res.ok) {
+          showToast('Meal plan saved!', 'success');
+          document.getElementById('save-plan-btn').textContent = '✓ Saved!';
+          document.getElementById('save-plan-btn').disabled = true;
+          loadSavedPlans();
+        } else {
+          showToast('Failed to save plan.', 'error');
+        }
+      } catch (err) {
         showToast('Failed to save plan.', 'error');
-      } else {
-        showToast('Meal plan saved!', 'success');
-        document.getElementById('save-plan-btn').textContent = '✓ Saved!';
-        document.getElementById('save-plan-btn').disabled = true;
-        loadSavedPlans();
+        console.error(err);
       }
     }
 
@@ -289,48 +301,73 @@
         return;
       }
 
-      const { data, error } = await sb
-        .from('meal_plans')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('created_at', { ascending: false })
-        .limit(6);
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch('/recipe-mind-final/api/meal-plans', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
 
-      loading.style.display = 'none';
+        loading.style.display = 'none';
 
-      if (error || !data || data.length === 0) {
+        if (!Array.isArray(data) || data.length === 0) {
+          empty.style.display = '';
+          return;
+        }
+
+        grid.innerHTML = data.map(plan => `
+          <div style="background:var(--white); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;">
+            <div>
+              <div style="font-family:var(--font-display); font-size:1rem; font-weight:600; color:var(--charcoal); margin-bottom:0.3rem;">${plan.title || 'Meal Plan'}</div>
+              <div style="font-size:0.8rem; color:var(--text-muted);">${new Date(plan.created_at).toLocaleDateString()}</div>
+            </div>
+            ${plan.ingredients_used ? `<div style="font-size:0.8rem; color:var(--text-muted); background:var(--cream); border-radius:var(--radius-sm); padding:0.5rem 0.75rem;">🥬 ${plan.ingredients_used.substring(0, 80)}${plan.ingredients_used.length > 80 ? '...' : ''}</div>` : ''}
+            <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+              <button class="btn btn-sm btn-secondary" onclick="viewSavedPlan('${plan.id}')">View</button>
+              <button class="btn btn-sm btn-ghost" onclick="deleteSavedPlan('${plan.id}', this)">Delete</button>
+            </div>
+          </div>`).join('');
+      } catch (err) {
+        console.error('Failed to load saved plans:', err);
+        loading.style.display = 'none';
         empty.style.display = '';
-        return;
       }
-
-      grid.innerHTML = data.map(plan => `
-        <div style="background:var(--white); border-radius:var(--radius-md); padding:1.25rem; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; gap:0.75rem;">
-          <div>
-            <div style="font-family:var(--font-display); font-size:1rem; font-weight:600; color:var(--charcoal); margin-bottom:0.3rem;">${plan.title}</div>
-            <div style="font-size:0.8rem; color:var(--text-muted);">${new Date(plan.created_at).toLocaleDateString()}</div>
-          </div>
-          ${plan.ingredients_used ? `<div style="font-size:0.8rem; color:var(--text-muted); background:var(--cream); border-radius:var(--radius-sm); padding:0.5rem 0.75rem;">🥬 ${plan.ingredients_used.substring(0, 80)}${plan.ingredients_used.length > 80 ? '...' : ''}</div>` : ''}
-          <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
-            <button class="btn btn-sm btn-secondary" onclick="viewSavedPlan('${plan.id}')">View</button>
-            <button class="btn btn-sm btn-ghost" onclick="deleteSavedPlan('${plan.id}', this)">Delete</button>
-          </div>
-        </div>`).join('');
     }
 
     async function viewSavedPlan(planId) {
-      const { data, error } = await sb.from('meal_plans').select('*').eq('id', planId).single();
-      if (error || !data) { showToast('Could not load plan.', 'error'); return; }
-      currentPlan = data.plan_data;
-      renderMealPlan(data.plan_data, data.ingredients_used || '', 'saved');
-      document.getElementById('save-plan-btn').style.display = 'none';
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch(`/recipe-mind-final/api/meal-plans/${planId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (res.ok) {
+          currentPlan = data.plan_data;
+          renderMealPlan(data.plan_data, data.ingredients_used || '', 'saved');
+          document.getElementById('save-plan-btn').style.display = 'none';
+        } else {
+          showToast('Could not load plan.', 'error');
+        }
+      } catch (err) {
+        showToast('Could not load plan.', 'error');
+        console.error(err);
+      }
     }
 
     async function deleteSavedPlan(planId, btn) {
-      const { error } = await sb.from('meal_plans').delete().eq('id', planId).eq('user_id', currentUser.id);
-      if (!error) {
-        btn.closest('div[style]').remove();
-        showToast('Plan deleted.', 'default');
-        loadSavedPlans();
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch(`/recipe-mind-final/api/meal-plans/${planId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          btn.closest('div[style]').remove();
+          showToast('Plan deleted.', 'default');
+          loadSavedPlans();
+        }
+      } catch (err) {
+        console.error('Failed to delete plan:', err);
       }
     }
   </script>
