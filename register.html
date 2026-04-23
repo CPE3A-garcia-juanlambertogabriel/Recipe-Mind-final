@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Create Account — RecipeMind</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -107,11 +106,22 @@
     </div>
   </div>
 
-  <script src="../js/config.js"></script>
+  <script src="js/config.js"></script>
   <script>
+    // Check for Google OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      localStorage.setItem('auth_token', token);
+      localStorage.setItem('user_id', urlParams.get('user_id') || '');
+      localStorage.setItem('user_email', urlParams.get('email') || '');
+      localStorage.setItem('username', urlParams.get('username') || '');
+      window.location.href = 'dashboard.html';
+    }
+
     (async () => {
       const user = await getCurrentUser();
-      if (user) window.location.href = '/index.html';
+      if (user) window.location.href = 'dashboard.html';
     })();
 
     function togglePassword() {
@@ -197,32 +207,41 @@
       btn.disabled = true;
       btn.textContent = 'Creating account...';
 
-      const { data, error } = await sb.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { full_name: fullname }
-        }
-      });
+      try {
+        const res = await fetch('/recipe-mind-final/api/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: fullname, email, password })
+        });
 
-      if (error) {
-        showError(error.message || 'Could not create account. Please try again.');
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          showError(data.error || 'Could not create account. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Create Account';
+          return;
+        }
+
+        // Store token and user info
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('user_id', data.user.id);
+        localStorage.setItem('user_email', data.user.email);
+        localStorage.setItem('username', data.user.username);
+
+        showSuccess('Account created! Redirecting to login...');
+        btn.textContent = 'Account Created!';
+        setTimeout(() => { window.location.href = 'login.html'; }, 1500);
+      } catch (err) {
+        showError('Registration failed. Please try again.');
         btn.disabled = false;
         btn.textContent = 'Create Account';
-        return;
       }
-
-      showSuccess('Account created! Check your email to confirm, then log in.');
-      btn.textContent = 'Account Created!';
-      setTimeout(() => { window.location.href = 'login.html'; }, 3000);
     }
 
-    async function handleGoogleSignup() {
-      const { error } = await sb.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin + '/index.html' }
-      });
-      if (error) showError(error.message);
+    function handleGoogleSignup() {
+      // Redirect to Google OAuth
+      window.location.href = '/recipe-mind-final/api/auth/google';
     }
   </script>
 </body>
