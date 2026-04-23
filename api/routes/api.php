@@ -15,9 +15,23 @@ class Router {
         $path = preg_replace('#^/recipe-mind-final/api#', '', $path);
         $path = str_replace('/api', '', $path);
         
+        // Extract query string for ID parameters
+        $query = parse_url($uri, PHP_URL_QUERY);
+        parse_str($query, $queryParams);
+        
         foreach ($this->routes as $route) {
+            // Try exact match first
             if ($route['method'] === $method && $route['path'] === $path) {
-                $this->callHandler($route['handler']);
+                $this->callHandler($route['handler'], $queryParams);
+                return;
+            }
+            
+            // Try pattern matching for dynamic routes like /meal-plans/{id}
+            $pattern = preg_replace('#\{[^}]+\}#', '([^/]+)', $route['path']);
+            $pattern = '#^' . $pattern . '$#';
+            if ($route['method'] === $method && preg_match($pattern, $path, $matches)) {
+                array_shift($matches); // Remove full match
+                $this->callHandler($route['handler'], array_merge($queryParams, ['id' => $matches[0] ?? null]));
                 return;
             }
         }
@@ -27,7 +41,7 @@ class Router {
         exit();
     }
     
-    private function callHandler($handler) {
+    private function callHandler($handler, $queryParams = []) {
         list($controllerName, $methodName) = explode('@', $handler);
         $controllerFile = __DIR__ . '/../controllers/' . $controllerName . '.php';
         
@@ -41,16 +55,20 @@ class Router {
         $controller = new $controllerName();
         
         // Get request data
-        $params = array_merge($_GET, $_POST);
+        $params = array_merge($_GET, $_POST, $queryParams);
         $input = json_decode(file_get_contents('php://input'), true) ?? [];
         $data = array_merge($params, $input);
+        
+        // Map 'id' to 'plan_id' for meal plan routes
+        if (isset($data['id']) && in_array($methodName, ['getSavedMealPlan', 'deleteSavedMealPlan'])) {
+            $data['plan_id'] = $data['id'];
+        }
         
         // ============ AUTHENTICATION MIDDLEWARE ============
         // Routes that require authentication
         $authRequiredRoutes = [
             'addFavorite', 'getFavorites', 'deleteFavorite',
-            'saveRecipe', 'getSavedRecipes', 'deleteSavedRecipe',
-            'getSavedMealPlans'
+            'getSavedMealPlans', 'getSavedMealPlan', 'deleteSavedMealPlan'
         ];
         
         // Get Authorization header
@@ -94,11 +112,17 @@ $router = new Router();
 $router->add('POST', '/auth/register', 'AuthController@register');
 $router->add('POST', '/auth/login', 'AuthController@login');
 
+// Google OAuth routes
+$router->add('GET', '/auth/google', 'GoogleAuthController@redirectToGoogle');
+$router->add('GET', '/auth/google/callback', 'GoogleAuthController@handleCallback');
+
 // API routes
 $router->add('GET', '/search', 'SearchController@searchRecipes');
 $router->add('GET', '/nutrition', 'NutritionController@getNutritionInfo');
 $router->add('POST', '/meal-plan', 'MealPlanController@generateMealPlan');
 $router->add('GET', '/meal-plans', 'MealPlanController@getSavedMealPlans');
+$router->add('GET', '/meal-plans/{id}', 'MealPlanController@getSavedMealPlan');
+$router->add('DELETE', '/meal-plans/{id}', 'MealPlanController@deleteSavedMealPlan');
 
 // Favorite recipes routes (require authentication)
 $router->add('GET', '/user/favorites', 'FavoritesController@getFavorites');
