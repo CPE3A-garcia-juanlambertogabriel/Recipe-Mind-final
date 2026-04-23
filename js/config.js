@@ -1,9 +1,5 @@
-const SUPABASE_URL = 'https://odpyultsywmjbmsauszp.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kcHl1bHRzeXdtamJtc2F1c3pwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY1MTM4OTcsImV4cCI6MjA5MjA4OTg5N30.BXvSwrZFIY3w4DZdaLYoEy38JeBF_5_rVsFApwM6Orw';
-
-
-const { createClient } = supabase;
-const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// MySQL Authentication (stored in localStorage)
+// No longer using Supabase
 
 function showToast(message, type = 'default') {
   const container = document.getElementById('toast-container') || createToastContainer();
@@ -37,17 +33,28 @@ function formatTime(minutes) {
 }
 
 async function requireAuth() {
-  const { data: { session } } = await sb.auth.getSession();
-  if (!session) {
-    window.location.href = '/login.html';
+  const token = localStorage.getItem('auth_token');
+  if (!token) {
+    // Redirect to login, but remember where we came from
+    const returnUrl = window.location.pathname + window.location.search;
+    window.location.href = '/recipe-mind-final/login.html?return=' + encodeURIComponent(returnUrl);
     return null;
   }
-  return session.user;
+  return {
+    id: localStorage.getItem('user_id'),
+    email: localStorage.getItem('user_email'),
+    username: localStorage.getItem('username')
+  };
 }
 
 async function getCurrentUser() {
-  const { data: { session } } = await sb.auth.getSession();
-  return session?.user || null;
+  const token = localStorage.getItem('auth_token');
+  if (!token) return null;
+  return {
+    id: localStorage.getItem('user_id'),
+    email: localStorage.getItem('user_email'),
+    username: localStorage.getItem('username')
+  };
 }
 
 async function updateNavAuth() {
@@ -61,7 +68,7 @@ async function updateNavAuth() {
     if (loginBtn) loginBtn.style.display = 'none';
     if (registerBtn) registerBtn.style.display = 'none';
     if (userMenu) userMenu.style.display = 'flex';
-    if (userEmail) userEmail.textContent = user.email.split('@')[0];
+    if (userEmail) userEmail.textContent = user.username || user.email.split('@')[0];
   } else {
     if (loginBtn) loginBtn.style.display = '';
     if (registerBtn) registerBtn.style.display = '';
@@ -70,6 +77,9 @@ async function updateNavAuth() {
 }
 
 async function logout() {
-  await sb.auth.signOut();
-  window.location.href = '/index.html';
+  localStorage.removeItem('auth_token');
+  localStorage.removeItem('user_id');
+  localStorage.removeItem('user_email');
+  localStorage.removeItem('username');
+  window.location.href = 'index.html';
 }
