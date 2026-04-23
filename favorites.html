@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>My Favorites — RecipeMind</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -22,6 +21,8 @@
         <li><a href="meal-plan.html">Meal Planner</a></li>
       </ul>
       <div class="nav-actions">
+        <a href="login.html" class="btn btn-ghost btn-sm" id="nav-login-btn">Login</a>
+        <a href="register.html" class="btn btn-primary btn-sm" id="nav-register-btn">Sign Up</a>
         <div id="nav-user-menu" style="display:none; align-items:center; gap:0.75rem;">
           <span style="font-size:0.85rem; color:var(--text-muted);">👤 <span id="nav-user-email"></span></span>
           <button class="btn btn-ghost btn-sm" onclick="logout()">Logout</button>
@@ -66,33 +67,39 @@
     </div>
   </footer>
 
-  <script src="../js/config.js"></script>
+  <script src="js/config.js"></script>
   <script>
     let currentUser = null;
 
     (async () => {
       currentUser = await requireAuth();
       if (!currentUser) return;
-      updateNavAuth();
+      await updateNavAuth();
       loadFavorites();
     })();
 
     async function loadFavorites() {
-      const { data, error } = await sb
-        .from('favorites')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .order('saved_at', { ascending: false });
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch('/recipe-mind-final/api/user/favorites', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        
+        document.getElementById('loading-state').style.display = 'none';
 
-      document.getElementById('loading-state').style.display = 'none';
+        if (!Array.isArray(data) || data.length === 0) {
+          document.getElementById('empty-state').style.display = '';
+          return;
+        }
 
-      if (error || !data || data.length === 0) {
+        renderFavorites(data);
+        document.getElementById('favorites-grid').style.display = 'grid';
+      } catch (err) {
+        console.error('Failed to load favorites:', err);
+        document.getElementById('loading-state').style.display = 'none';
         document.getElementById('empty-state').style.display = '';
-        return;
       }
-
-      renderFavorites(data);
-      document.getElementById('favorites-grid').style.display = 'grid';
     }
 
     function renderFavorites(favorites) {
@@ -139,29 +146,33 @@
     }
 
     async function removeFavorite(recipeId) {
-      const { error } = await sb
-        .from('favorites')
-        .delete()
-        .eq('user_id', currentUser.id)
-        .eq('recipe_id', recipeId);
-
-      if (!error) {
-        const card = document.getElementById(`fav-card-${recipeId}`);
-        if (card) {
-          card.style.opacity = '0';
-          card.style.transform = 'scale(0.9)';
-          card.style.transition = '0.3s ease';
-          setTimeout(() => {
-            card.remove();
-            
-            const grid = document.getElementById('favorites-grid');
-            if (grid.children.length === 0) {
-              grid.style.display = 'none';
-              document.getElementById('empty-state').style.display = '';
-            }
-          }, 300);
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch(`/recipe-mind-final/api/user/favorites?recipe_id=${recipeId}`, {
+          method: 'DELETE',
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        
+        if (res.ok) {
+          const card = document.getElementById(`fav-card-${recipeId}`);
+          if (card) {
+            card.style.opacity = '0';
+            card.style.transform = 'scale(0.9)';
+            card.style.transition = '0.3s ease';
+            setTimeout(() => {
+              card.remove();
+              
+              const grid = document.getElementById('favorites-grid');
+              if (grid.children.length === 0) {
+                grid.style.display = 'none';
+                document.getElementById('empty-state').style.display = '';
+              }
+            }, 300);
+          }
+          showToast('Removed from favorites', 'default');
         }
-        showToast('Removed from favorites', 'default');
+      } catch (err) {
+        console.error('Failed to remove favorite:', err);
       }
     }
 
@@ -184,7 +195,7 @@
       }
 
       try {
-        const res = await fetch(`/api/nutrition?query=${encodeURIComponent(recipeName)}`);
+        const res = await fetch(`/recipe-mind-final/api/nutrition?query=${encodeURIComponent(recipeName)}`);
         const data = await res.json();
         const hit = data.hits?.[0]?.recipe;
         const spinner = modal.querySelector('.loading-spinner');
