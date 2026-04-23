@@ -36,7 +36,11 @@ class AuthController {
             
             $this->sendSuccessResponse([
                 'message' => 'User registered successfully',
-                'user_id' => $userId,
+                'user' => [
+                    'id' => $userId,
+                    'username' => $username,
+                    'email' => $email
+                ],
                 'token' => $token
             ]);
             
