@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Find Recipes — RecipeMind</title>
   <link rel="stylesheet" href="css/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -110,14 +109,14 @@
     </div>
   </footer>
 
-  <script src="../js/config.js"></script>
+  <script src="js/config.js"></script>
   <script>
     let ingredients = [];
     let currentUser = null;
     let userFavorites = new Set();
 
     (async () => {
-      updateNavAuth();
+      await updateNavAuth();
       currentUser = await getCurrentUser();
       if (currentUser) await loadUserFavorites();
 
@@ -133,8 +132,18 @@
     })();
 
     async function loadUserFavorites() {
-      const { data } = await sb.from('favorites').select('recipe_id').eq('user_id', currentUser.id);
-      if (data) data.forEach(f => userFavorites.add(f.recipe_id));
+      const token = localStorage.getItem('auth_token');
+      try {
+        const res = await fetch('/recipe-mind-final/api/user/favorites', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          data.forEach(f => userFavorites.add(String(f.recipe_id)));
+        }
+      } catch (err) {
+        console.error('Failed to load favorites:', err);
+      }
     }
 
     function addIngredient() {
@@ -185,7 +194,7 @@
       showState('loading');
 
       try {
-        const res = await fetch(`/api/search?ingredients=${encodeURIComponent(ingredients.join(','))}`);
+        const res = await fetch(`/recipe-mind-final/api/search?ingredients=${encodeURIComponent(ingredients.join(','))}`);
         const data = await res.json();
 
         if (!data || data.length === 0) {
@@ -252,33 +261,50 @@
 
       const id = String(recipeId);
       const btn = document.getElementById(`fav-btn-${recipeId}`);
+      const token = localStorage.getItem('auth_token');
 
       if (userFavorites.has(id)) {
-        const { error } = await sb.from('favorites')
-          .delete()
-          .eq('user_id', currentUser.id)
-          .eq('recipe_id', id);
-
-        if (!error) {
-          userFavorites.delete(id);
-          btn.textContent = '🤍';
-          btn.classList.remove('active');
-          showToast('Removed from favorites', 'default');
+        // Remove from favorites
+        try {
+          const res = await fetch(`/recipe-mind-final/api/user/favorites?recipe_id=${id}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          const data = await res.json();
+          if (res.ok) {
+            userFavorites.delete(id);
+            btn.textContent = '🤍';
+            btn.classList.remove('active');
+            showToast('Removed from favorites', 'default');
+          }
+        } catch (err) {
+          console.error('Failed to remove favorite:', err);
         }
       } else {
-        const { error } = await sb.from('favorites').insert({
-          user_id: currentUser.id,
-          recipe_id: id,
-          recipe_title: title,
-          recipe_image: image,
-          recipe_source: 'spoonacular'
-        });
-
-        if (!error) {
-          userFavorites.add(id);
-          btn.textContent = '❤️';
-          btn.classList.add('active');
-          showToast('Saved to favorites!', 'success');
+        // Add to favorites
+        try {
+          const res = await fetch('/recipe-mind-final/api/user/favorites', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({
+              recipe_id: id,
+              recipe_title: title,
+              recipe_image: image,
+              source_url: 'spoonacular'
+            })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            userFavorites.add(id);
+            btn.textContent = '❤️';
+            btn.classList.add('active');
+            showToast('Saved to favorites!', 'success');
+          }
+        } catch (err) {
+          console.error('Failed to add favorite:', err);
         }
       }
     }
@@ -291,7 +317,7 @@
       document.getElementById('nutrition-content').style.display = 'none';
 
       try {
-        const res = await fetch(`/api/nutrition?query=${encodeURIComponent(recipeName)}`);
+        const res = await fetch(`/recipe-mind-final/api/nutrition?query=${encodeURIComponent(recipeName)}`);
         const data = await res.json();
 
         const hit = data.hits?.[0]?.recipe;
